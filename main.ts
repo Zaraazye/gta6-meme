@@ -20,7 +20,27 @@ mkdirSync(targetDir, { recursive: true });
 // Read first so a missing or unreadable source fails loudly instead of
 // silently producing an empty output file.
 const contents = readFileSync(source);
+
+// The entry's whole point is the recorded post URL: refuse to copy a
+// POST.json that does not actually name one, instead of shipping a
+// broken reference to the judges.
+const parsed = JSON.parse(contents.toString("utf8")) as unknown;
+if (
+  typeof parsed !== "object" ||
+  parsed === null ||
+  typeof (parsed as { url?: unknown }).url !== "string" ||
+  (parsed as { url: string }).url.length === 0
+) {
+  throw new Error("POST.json must be a JSON object with a non-empty url string");
+}
 copyFileSync(source, target);
+
+// Verify the copy byte-for-byte: a truncated or partial output must fail
+// loudly rather than reach the judges.
+const written = readFileSync(target);
+if (!written.equals(contents)) {
+  throw new Error(`copy verification failed: ${target} differs from ${source}`);
+}
 
 console.log(
   `Copied POST.json (${contents.length} bytes) to ${target}`,
